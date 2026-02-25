@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Teacher {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  password  String
+  subjects  Subject[]
+  createdAt DateTime  @default(now())
+}
+
+model Student {
+  id        String     @id @default(uuid())
+  name      String
+  email     String     @unique
+  password  String
+  progress  Progress[]
+  createdAt DateTime   @default(now())
+}
+
+model Subject {
+  id        String    @id @default(uuid())
+  title     String
+  teacher   Teacher   @relation(fields: [teacherId], references: [id])
+  teacherId String
+  lessons   Lesson[]
+  createdAt DateTime  @default(now())
+}
+
+model Lesson {
+  id          String     @id @default(uuid())
+  title       String
+  content     String
+  subject     Subject    @relation(fields: [subjectId], references: [id])
+  subjectId   String
+  progress    Progress[]
+  createdAt   DateTime   @default(now())
+}
+
+model Progress {
+  id          String   @id @default(uuid())
+  student     Student  @relation(fields: [studentId], references: [id])
+  studentId   String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id])
+  lessonId    String
+  completed   Boolean  @default(false)
+  score       Int?
+  createdAt   DateTime @default(now())
+}
