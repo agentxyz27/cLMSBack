@@ -1,3 +1,23 @@
+/**
+ * Prisma Schema
+ * 
+ * Database: PostgreSQL (Neon)
+ * ORM: Prisma 6
+ * 
+ * Models:
+ * - Teacher    → creates and manages subjects and lessons
+ * - Student    → enrolls and tracks progress through lessons
+ * - Subject    → a course owned by a teacher, contains lessons
+ * - Lesson     → individual learning unit under a subject
+ * - Progress   → tracks student completion and score per lesson
+ * 
+ * IDs use auto increment integers for simplicity and easier debugging.
+ * Foreign keys use Int to match.
+ */
+
+
+
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,48 +28,49 @@ datasource db {
 }
 
 model Teacher {
-  id        String    @id @default(uuid())
+  id        Int       @id @default(autoincrement())
   name      String
   email     String    @unique
-  password  String
+  password  String    // stored as bcrypt hash, never plain text
   subjects  Subject[]
   createdAt DateTime  @default(now())
 }
 
 model Student {
-  id        String     @id @default(uuid())
+  id        Int        @id @default(autoincrement())
   name      String
+  lrn       String     @unique  // 12-digit Learner Reference Number, stored as string
   email     String     @unique
-  password  String
+  password  String     // stored as bcrypt hash, never plain text
   progress  Progress[]
   createdAt DateTime   @default(now())
 }
 
 model Subject {
-  id        String    @id @default(uuid())
+  id        Int       @id @default(autoincrement())
   title     String
   teacher   Teacher   @relation(fields: [teacherId], references: [id])
-  teacherId String
+  teacherId Int       // foreign key — links subject to its owner teacher
   lessons   Lesson[]
   createdAt DateTime  @default(now())
 }
 
 model Lesson {
-  id          String     @id @default(uuid())
-  title       String
-  content     String
-  subject     Subject    @relation(fields: [subjectId], references: [id])
-  subjectId   String
-  progress    Progress[]
-  createdAt   DateTime   @default(now())
+  id        Int        @id @default(autoincrement())
+  title     String
+  content   String
+  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId Int
+  progress  Progress[]
+  createdAt DateTime   @default(now())
 }
 
 model Progress {
-  id          String   @id @default(uuid())
-  student     Student  @relation(fields: [studentId], references: [id])
-  studentId   String
-  lesson      Lesson   @relation(fields: [lessonId], references: [id])
-  lessonId    String
+  id          Int      @id @default(autoincrement())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   Int
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId    Int
   completed   Boolean  @default(false)
   score       Int?
   createdAt   DateTime @default(now())

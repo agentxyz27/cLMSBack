@@ -36,7 +36,7 @@ const getLessons = async (req, res) => {
     const { subjectId } = req.params
 
     const lessons = await prisma.lesson.findMany({
-      where: { subjectId }
+      where: { subjectId: parseInt(subjectId) } // convert string to integer
     })
 
     res.json(lessons)
@@ -45,4 +45,43 @@ const getLessons = async (req, res) => {
   }
 }
 
-module.exports = { createLesson, getLessons }
+/**
+ * PUT /api/lessons/:id
+ * Updates a lesson title and content by ID.
+ */
+const updateLesson = async (req, res) => {
+  try {
+    const { title, content } = req.body
+    const id = parseInt(req.params.id)
+
+    const lesson = await prisma.lesson.update({
+      where: { id },
+      data: { title, content }
+    })
+
+    res.json({ message: 'Lesson updated', lesson })
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+}
+
+/**
+ * DELETE /api/lessons/:id
+ * Deletes a lesson by ID.
+ * Progress records linked to this lesson are cascade deleted automatically.
+ */
+const deleteLesson = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+
+    await prisma.lesson.delete({
+      where: { id }
+    })
+
+    res.json({ message: 'Lesson deleted' })
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+}
+
+module.exports = { createLesson, getLessons, updateLesson, deleteLesson }

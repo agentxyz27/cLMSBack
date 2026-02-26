@@ -10,10 +10,13 @@
 const express = require('express')
 const router = express.Router()
 const protect = require('../middleware/auth')
-const { createSubject, getSubjects } = require('../controllers/subjectController')
+const { createSubject, getSubjects, updateSubject, deleteSubject } = require('../controllers/subjectController')
 
 // protect is applied per route so we can later add role-based access (e.g. admin, student)
 router.post('/', protect, createSubject)
 router.get('/', protect, getSubjects)
+router.put('/:id', protect, updateSubject)
+router.delete('/:id', protect, deleteSubject)
 
 module.exports = router
+
