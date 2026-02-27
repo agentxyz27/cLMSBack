@@ -1,22 +1,21 @@
 /**
  * Prisma Schema
  * 
- * Database: PostgreSQL (Neon)
+ * Database: PostgreSQL (Supabase)
  * ORM: Prisma 6
  * 
  * Models:
- * - Teacher    → creates and manages subjects and lessons
- * - Student    → enrolls and tracks progress through lessons
- * - Subject    → a course owned by a teacher, contains lessons
- * - Lesson     → individual learning unit under a subject
- * - Progress   → tracks student completion and score per lesson
+ * - Teacher      → creates and manages subjects and lessons
+ * - Student      → enrolls and tracks progress through lessons
+ * - Subject      → a course owned by a teacher, contains lessons
+ * - Lesson       → individual learning unit under a subject
+ * - Progress     → tracks student completion and score per lesson
+ * - Badge        → milestone rewards defined by the system
+ * - StudentBadge → tracks which student earned which badge
  * 
  * IDs use auto increment integers for simplicity and easier debugging.
  * Foreign keys use Int to match.
  */
-
-
-
 
 generator client {
   provider = "prisma-client-js"
@@ -37,13 +36,16 @@ model Teacher {
 }
 
 model Student {
-  id        Int        @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   name      String
-  lrn       String     @unique  // 12-digit Learner Reference Number, stored as string
-  email     String     @unique
-  password  String     // stored as bcrypt hash, never plain text
+  lrn       String         @unique     // 12-digit Learner Reference Number, stored as string
+  email     String         @unique
+  password  String                     // stored as bcrypt hash, never plain text
+  xp        Int            @default(0) // total experience points earned
+  level     Int            @default(1) // level up every 100 XP
   progress  Progress[]
-  createdAt DateTime   @default(now())
+  badges    StudentBadge[]             // badges earned by this student
+  createdAt DateTime       @default(now())
 }
 
 model Subject {
@@ -60,7 +62,7 @@ model Lesson {
   title     String
   content   String
   subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  subjectId Int
+  subjectId Int        // foreign key — links lesson to its parent subject
   progress  Progress[]
   createdAt DateTime   @default(now())
 }
@@ -68,10 +70,31 @@ model Lesson {
 model Progress {
   id          Int      @id @default(autoincrement())
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  studentId   Int
+  studentId   Int      // foreign key — which student
   lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  lessonId    Int
+  lessonId    Int      // foreign key — which lesson
   completed   Boolean  @default(false)
-  score       Int?
+  score       Int?     // optional — not all lessons have scores
+  xpEarned    Int      @default(0)  // XP awarded for completing this lesson
   createdAt   DateTime @default(now())
+}
+
+// Badge definitions — created by the system, not by teachers or students
+model Badge {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique
+  description String
+  xpRequired  Int            // minimum XP needed to earn this badge
+  students    StudentBadge[]
+  createdAt   DateTime       @default(now())
+}
+
+// Junction table — tracks which student earned which badge and when
+model StudentBadge {
+  id        Int      @id @default(autoincrement())
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId Int
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  badgeId   Int
+  earnedAt  DateTime @default(now())
 }

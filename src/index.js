@@ -24,11 +24,13 @@ const authRoutes = require('./routes/auth')
 const subjectRoutes = require('./routes/subjects')
 const lessonRoutes = require('./routes/lessons')
 const progressRoutes = require('./routes/progress')
+const gamificationRoutes = require('./routes/gamification')
 
 app.use('/api/auth', authRoutes)          // teacher/student auth
 app.use('/api/subjects', subjectRoutes)   // subject CRUD (teacher only)
 app.use('/api/lessons', lessonRoutes)     //lessons
 app.use('/api/progress', progressRoutes)  //progress
+app.use('/api/gamification', gamificationRoutes)
 
 // ========================
 // Start Server
