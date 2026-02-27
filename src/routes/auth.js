@@ -9,10 +9,12 @@
  */
 const express = require('express')
 const router = express.Router()
-const { registerTeacher, loginTeacher } = require('../controllers/authController')
+const { registerTeacher, loginTeacher, registerStudent, loginStudent } = require('../controllers/authController')
 
 // No protect middleware here — these routes must be publicly accessible
 router.post('/register', registerTeacher)
 router.post('/login', loginTeacher)
+router.post('/student/register', registerStudent)
+router.post('/student/login', loginStudent)
 
 module.exports = router
