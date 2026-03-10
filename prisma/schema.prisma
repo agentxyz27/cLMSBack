@@ -12,6 +12,7 @@
  * - Progress     → tracks student completion and score per lesson
  * - Badge        → milestone rewards defined by the system
  * - StudentBadge → tracks which student earned which badge
+ * - Enrollment   → tracks which student is enrolled in which subject
  * 
  * IDs use auto increment integers for simplicity and easier debugging.
  * Foreign keys use Int to match.
@@ -35,25 +36,27 @@ model Teacher {
 }
 
 model Student {
-  id        Int            @id @default(autoincrement())
-  name      String
-  lrn       String         @unique     // 12-digit Learner Reference Number, stored as string
-  email     String         @unique
-  password  String                     // stored as bcrypt hash, never plain text
-  xp        Int            @default(0) // total experience points earned
-  level     Int            @default(1) // level up every 100 XP
-  progress  Progress[]
-  badges    StudentBadge[]             // badges earned by this student
-  createdAt DateTime       @default(now())
+  id          Int            @id @default(autoincrement())
+  name        String
+  lrn         String         @unique     // 12-digit Learner Reference Number, stored as string
+  email       String         @unique
+  password    String                     // stored as bcrypt hash, never plain text
+  xp          Int            @default(0) // total experience points earned
+  level       Int            @default(1) // level up every 100 XP
+  progress    Progress[]
+  badges      StudentBadge[]             // badges earned by this student
+  enrollments Enrollment[]               // subjects this student is enrolled in
+  createdAt   DateTime       @default(now())
 }
 
 model Subject {
-  id        Int       @id @default(autoincrement())
-  title     String
-  teacher   Teacher   @relation(fields: [teacherId], references: [id])
-  teacherId Int       // foreign key — links subject to its owner teacher
-  lessons   Lesson[]
-  createdAt DateTime  @default(now())
+  id          Int          @id @default(autoincrement())
+  title       String
+  teacher     Teacher      @relation(fields: [teacherId], references: [id])
+  teacherId   Int          // foreign key — links subject to its owner teacher
+  lessons     Lesson[]
+  enrollments Enrollment[] // students enrolled in this subject
+  createdAt   DateTime     @default(now())
 }
 
 model Lesson {
@@ -96,4 +99,16 @@ model StudentBadge {
   badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
   badgeId   Int
   earnedAt  DateTime @default(now())
+}
+
+// Junction table — tracks which student is enrolled in which subject
+model Enrollment {
+  id         Int      @id @default(autoincrement())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId  Int
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId  Int
+  enrolledAt DateTime @default(now())
+
+  @@unique([studentId, subjectId]) // prevent duplicate enrollments
 }

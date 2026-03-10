@@ -7,13 +7,14 @@ const app = express()
 // ========================
 // Middleware
 // ========================
-app.use(cors())          // allows frontend to talk to this API
+
+app.use(cors({ origin: 'http://localhost:5173' })) // allows Vite frontend to talk to this API
 app.use(express.json())  // parses incoming JSON request bodies
 
 // ========================
 // Health Check
 // ========================
-app.get('/', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ message: 'cLMS API running' })
 })
 
@@ -31,6 +32,7 @@ app.use('/api/subjects', subjectRoutes)   // subject CRUD (teacher only)
 app.use('/api/lessons', lessonRoutes)     //lessons
 app.use('/api/progress', progressRoutes)  //progress
 app.use('/api/gamification', gamificationRoutes)
+app.use('/api/enrollment', require('./routes/enrollment'))
 
 // ========================
 // Start Server
