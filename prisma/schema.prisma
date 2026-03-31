@@ -1,19 +1,23 @@
 /**
  * Prisma Schema
- * 
+ *
  * Database: PostgreSQL (Supabase)
- * ORM: Prisma 6
- * 
+ * ORM: Prisma 7
+ *
  * Models:
  * - Teacher      → creates and manages subjects and lessons
  * - Student      → enrolls and tracks progress through lessons
- * - Subject      → a course owned by a teacher, contains lessons
- * - Lesson       → individual learning unit under a subject
- * - Progress     → tracks student completion and score per lesson
  * - Badge        → milestone rewards defined by the system
+ * - Subject      → a course owned by a teacher, contains lessons
+ * - Lesson       → individual learning unit under a subject, contains blocks
+ * - LessonBlock  → a single content block inside a lesson (text, image, video, file, math)
+ * - Progress     → tracks student completion and score per lesson
  * - StudentBadge → tracks which student earned which badge
  * - Enrollment   → tracks which student is enrolled in which subject
- * 
+ *
+ * Model ordering follows the dependency chain:
+ *   Independent models first → dependent models next → junction tables last
+ *
  * IDs use auto increment integers for simplicity and easier debugging.
  * Foreign keys use Int to match.
  */
@@ -25,6 +29,8 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ── Independent Models ─────────────────────────────────────────────────────
 
 model Teacher {
   id        Int       @id @default(autoincrement())
@@ -38,50 +44,17 @@ model Teacher {
 model Student {
   id          Int            @id @default(autoincrement())
   name        String
-  lrn         String         @unique     // 12-digit Learner Reference Number, stored as string
+  lrn         String         @unique // 12-digit Learner Reference Number, stored as string
   email       String         @unique
-  password    String                     // stored as bcrypt hash, never plain text
+  password    String         // stored as bcrypt hash, never plain text
   xp          Int            @default(0) // total experience points earned
   level       Int            @default(1) // level up every 100 XP
   progress    Progress[]
-  badges      StudentBadge[]             // badges earned by this student
-  enrollments Enrollment[]               // subjects this student is enrolled in
+  badges      StudentBadge[]
+  enrollments Enrollment[]
   createdAt   DateTime       @default(now())
 }
 
-model Subject {
-  id          Int          @id @default(autoincrement())
-  title       String
-  teacher     Teacher      @relation(fields: [teacherId], references: [id])
-  teacherId   Int          // foreign key — links subject to its owner teacher
-  lessons     Lesson[]
-  enrollments Enrollment[] // students enrolled in this subject
-  createdAt   DateTime     @default(now())
-}
-
-model Lesson {
-  id        Int        @id @default(autoincrement())
-  title     String
-  content   String
-  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  subjectId Int        // foreign key — links lesson to its parent subject
-  progress  Progress[]
-  createdAt DateTime   @default(now())
-}
-
-model Progress {
-  id          Int      @id @default(autoincrement())
-  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  studentId   Int      // foreign key — which student
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  lessonId    Int      // foreign key — which lesson
-  completed   Boolean  @default(false)
-  score       Int?     // optional — not all lessons have scores
-  xpEarned    Int      @default(0)  // XP awarded for completing this lesson
-  createdAt   DateTime @default(now())
-}
-
-// Badge definitions — created by the system, not by teachers or students
 model Badge {
   id          Int            @id @default(autoincrement())
   name        String         @unique
@@ -91,7 +64,68 @@ model Badge {
   createdAt   DateTime       @default(now())
 }
 
-// Junction table — tracks which student earned which badge and when
+// ── Dependent Models ───────────────────────────────────────────────────────
+
+model Subject {
+  id          Int          @id @default(autoincrement())
+  title       String
+  teacher     Teacher      @relation(fields: [teacherId], references: [id])
+  teacherId   Int          // foreign key — links subject to its owner teacher
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+}
+
+model Lesson {
+  id        Int           @id @default(autoincrement())
+  title     String
+  // content removed — replaced by LessonBlock[]
+  // lessons now store content as ordered blocks instead of plain text
+  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId Int           // foreign key — links lesson to its parent subject
+  progress  Progress[]
+  blocks    LessonBlock[]
+  createdAt DateTime      @default(now())
+}
+
+// A single content block inside a lesson.
+// Lessons are composed of an ordered list of blocks.
+// Each block has a type and a JSON data payload.
+//
+// Block types and their data shapes:
+//   text  → { html: string }
+//   image → { url: string, alt: string }
+//   video → { url: string, title: string }
+//   file  → { url: string, name: string, fileType: string }
+//   math  → { expression: string }
+//
+// Adding new block types requires no schema changes —
+// just a new type string and a new frontend renderer.
+model LessonBlock {
+  id        Int      @id @default(autoincrement())
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId  Int      // foreign key — which lesson this block belongs to
+  order     Int      // position in the lesson — 1, 2, 3...
+  type      String   // 'text' | 'image' | 'video' | 'file' | 'math'
+  data      Json     // shape depends on type — see block types above
+  createdAt DateTime @default(now())
+}
+
+// ── Junction Tables ────────────────────────────────────────────────────────
+
+model Progress {
+  id        Int      @id @default(autoincrement())
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId Int      // foreign key — which student
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId  Int      // foreign key — which lesson
+  completed Boolean  @default(false)
+  score     Int?     // optional — not all lessons have scores
+  xpEarned  Int      @default(0) // XP awarded for completing this lesson
+  createdAt DateTime @default(now())
+}
+
+// Tracks which student earned which badge and when
 model StudentBadge {
   id        Int      @id @default(autoincrement())
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -101,7 +135,7 @@ model StudentBadge {
   earnedAt  DateTime @default(now())
 }
 
-// Junction table — tracks which student is enrolled in which subject
+// Tracks which student is enrolled in which subject
 model Enrollment {
   id         Int      @id @default(autoincrement())
   student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
