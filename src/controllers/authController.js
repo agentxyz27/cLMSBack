@@ -121,4 +121,51 @@ const loginStudent = async (req, res) => {
   }
 }
 
-module.exports = { registerTeacher, loginTeacher, registerStudent, loginStudent }
+/**
+ * GET /api/auth/me
+ * Returns the logged-in user's profile based on their role.
+ * Role and id come from the decoded JWT via protect middleware.
+ * Never returns the password field.
+ */
+const getMe = async (req, res) => {
+  try {
+    const { id, role } = req.user
+
+    if (role === 'teacher') {
+      const teacher = await prisma.teacher.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true
+        }
+      })
+      if (!teacher) return res.status(404).json({ message: 'Teacher not found' })
+      return res.json({ ...teacher, role: 'teacher' })
+    }
+
+    if (role === 'student') {
+      const student = await prisma.student.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          lrn: true,
+          xp: true,
+          level: true,
+          createdAt: true
+        }
+      })
+      if (!student) return res.status(404).json({ message: 'Student not found' })
+      return res.json({ ...student, role: 'student' })
+    }
+
+    res.status(400).json({ message: 'Invalid role' })
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+}
+
+module.exports = { registerTeacher, loginTeacher, registerStudent, loginStudent, getMe }
