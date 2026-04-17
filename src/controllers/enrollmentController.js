@@ -61,13 +61,7 @@ const getMySubjects = async (req, res) => {
       include: {
         subject: {
           include: {
-            lessons: {
-              include: {
-                blocks: {
-                  orderBy: { order: 'asc' } // always return blocks in correct order
-                }
-              }
-            },
+            lessons: true,
             teacher: {
               select: { id: true, name: true } // exclude password
             }
@@ -95,13 +89,8 @@ const getAllSubjects = async (req, res) => {
   try {
     const subjects = await prisma.subject.findMany({
       include: {
-        lessons: {
-          include: {
-            blocks: {
-              orderBy: { order: 'asc' } // always return blocks in correct order
-            }
-          }
-        },
+        lessons: true,
+          
         teacher: {
           select: { id: true, name: true } // exclude password
         }

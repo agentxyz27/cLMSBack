@@ -7,13 +7,24 @@
  * Models:
  * - Teacher      → creates and manages subjects and lessons
  * - Student      → enrolls and tracks progress through lessons
+ * - Admin        → manages templates and oversees the system
  * - Badge        → milestone rewards defined by the system
  * - Subject      → a course owned by a teacher, contains lessons
- * - Lesson       → individual learning unit under a subject, contains blocks
- * - LessonBlock  → a single content block inside a lesson (text, image, video, file, math)
+ * - Lesson       → individual learning unit under a subject, stored as canvas JSON
+ * - Template     → reusable canvas layout, owned by a teacher or admin
  * - Progress     → tracks student completion and score per lesson
  * - StudentBadge → tracks which student earned which badge
  * - Enrollment   → tracks which student is enrolled in which subject
+ *
+ * Changes from previous schema:
+ * - LessonBlock model removed — lessons now store content as canvas JSON
+ * - Lesson.contentJson added — replaces the blocks relation
+ * - Lesson.updatedAt added — needed for save tracking
+ * - Admin model added — standalone role for template curation and system management
+ * - Template model added — reusable canvas layouts, ownable by teacher or admin
+ *
+ * Template ownership uses two nullable FKs (teacherId, adminId).
+ * Exactly one must be set. Enforced at the application layer.
  *
  * Model ordering follows the dependency chain:
  *   Independent models first → dependent models next → junction tables last
@@ -33,12 +44,13 @@ datasource db {
 // ── Independent Models ─────────────────────────────────────────────────────
 
 model Teacher {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   name      String
-  email     String    @unique
-  password  String    // stored as bcrypt hash, never plain text
+  email     String     @unique
+  password  String     // stored as bcrypt hash, never plain text
   subjects  Subject[]
-  createdAt DateTime  @default(now())
+  templates Template[] // templates created by this teacher
+  createdAt DateTime   @default(now())
 }
 
 model Student {
@@ -53,6 +65,18 @@ model Student {
   badges      StudentBadge[]
   enrollments Enrollment[]
   createdAt   DateTime       @default(now())
+}
+
+// Admins manage the global template pool and can oversee lessons/subjects.
+// Separate model from Teacher and Student — not a flag on an existing model.
+// Admins do not enroll, do not earn XP, and do not own subjects.
+model Admin {
+  id        Int        @id @default(autoincrement())
+  name      String
+  email     String     @unique
+  password  String     // stored as bcrypt hash, never plain text
+  templates Template[] // templates created by this admin
+  createdAt DateTime   @default(now())
 }
 
 model Badge {
@@ -76,39 +100,67 @@ model Subject {
   createdAt   DateTime     @default(now())
 }
 
+// Lessons now store content as a single canvas JSON blob.
+// The canvas JSON shape is:
+//
+//   {
+//     "canvas": {
+//       "width": 1280,
+//       "height": 720,
+//       "background": "#ffffff"
+//     },
+//     "elements": [
+//       {
+//         "id": "el_1",
+//         "type": "text" | "image" | "shape",
+//         "x": 100,
+//         "y": 80,
+//         "width": 300,
+//         "height": 80,
+//         "props": { ... }
+//       }
+//     ]
+//   }
+//
+// contentJson is nullable — a lesson can exist with no content yet (blank canvas).
+// updatedAt tracks the last save, used for optimistic save feedback in the editor.
 model Lesson {
-  id        Int           @id @default(autoincrement())
-  title     String
-  // content removed — replaced by LessonBlock[]
-  // lessons now store content as ordered blocks instead of plain text
-  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  subjectId Int           // foreign key — links lesson to its parent subject
-  progress  Progress[]
-  blocks    LessonBlock[]
-  createdAt DateTime      @default(now())
+  id          Int        @id @default(autoincrement())
+  title       String
+  contentJson Json?      // canvas JSON — null means blank canvas
+  subject     Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId   Int        // foreign key — links lesson to its parent subject
+  progress    Progress[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt // auto-updated on every save
 }
 
-// A single content block inside a lesson.
-// Lessons are composed of an ordered list of blocks.
-// Each block has a type and a JSON data payload.
+// Reusable canvas layouts that teachers or admins can publish globally.
+// Ownership is polymorphic via two nullable FKs — exactly one must be non-null.
+// This is enforced at the application layer, not the DB layer.
 //
-// Block types and their data shapes:
-//   text  → { html: string }
-//   image → { url: string, alt: string }
-//   video → { url: string, title: string }
-//   file  → { url: string, name: string, fileType: string }
-//   math  → { expression: string }
+// isPublic controls visibility in the global template library.
+// usageCount increments each time a teacher duplicates this template into a lesson.
 //
-// Adding new block types requires no schema changes —
-// just a new type string and a new frontend renderer.
-model LessonBlock {
-  id        Int      @id @default(autoincrement())
-  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  lessonId  Int      // foreign key — which lesson this block belongs to
-  order     Int      // position in the lesson — 1, 2, 3...
-  type      String   // 'text' | 'image' | 'video' | 'file' | 'math'
-  data      Json     // shape depends on type — see block types above
-  createdAt DateTime @default(now())
+// Ownership rules:
+//   - teacherId set, adminId null  → owned by a teacher
+//   - adminId set, teacherId null  → owned by an admin
+//   - both null or both set        → invalid, rejected by application layer
+model Template {
+  id          Int      @id @default(autoincrement())
+  title       String
+  contentJson Json     // canvas JSON — templates must always have content
+  isPublic    Boolean  @default(false) // false = draft, true = visible in global library
+  usageCount  Int      @default(0)     // incremented on each duplication
+
+  // Nullable FK pair — exactly one is set
+  teacher     Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  teacherId   Int?     // set if owned by a teacher, null if owned by admin
+  admin       Admin?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  adminId     Int?     // set if owned by an admin, null if owned by teacher
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ── Junction Tables ────────────────────────────────────────────────────────

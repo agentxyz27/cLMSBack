@@ -33,8 +33,8 @@ app.use('/api/lessons', lessonRoutes)     //lessons
 app.use('/api/progress', progressRoutes)  //progress
 app.use('/api/gamification', gamificationRoutes)
 app.use('/api/enrollment', require('./routes/enrollment'))
-app.use('/api/blocks', require('./routes/blocks'))
 app.use('/api/upload', require('./routes/upload'))
+app.use('/api/templates', require('./routes/templates'))
 
 // ========================
 // Start Server
