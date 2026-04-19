@@ -22,19 +22,21 @@ app.get('/api/health', (req, res) => {
 // Routes
 // ========================
 const authRoutes = require('./routes/auth')
-const subjectRoutes = require('./routes/subjects')
+const sectionRoutes = require('./routes/section')
+const classroomRoutes = require('./routes/classroom')
 const lessonRoutes = require('./routes/lessons')
 const progressRoutes = require('./routes/progress')
 const gamificationRoutes = require('./routes/gamification')
+const templateRoutes = require('./routes/templates')
 
 app.use('/api/auth', authRoutes)          // teacher/student auth
-app.use('/api/subjects', subjectRoutes)   // subject CRUD (teacher only)
+app.use('/api/sections', sectionRoutes)   //sections for registration form
+app.use('/api/classrooms', classroomRoutes)   //classrooms
 app.use('/api/lessons', lessonRoutes)     //lessons
 app.use('/api/progress', progressRoutes)  //progress
 app.use('/api/gamification', gamificationRoutes)
-app.use('/api/enrollment', require('./routes/enrollment'))
 app.use('/api/upload', require('./routes/upload'))
-app.use('/api/templates', require('./routes/templates'))
+app.use('/api/templates', templateRoutes)
 
 // ========================
 // Start Server

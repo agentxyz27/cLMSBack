@@ -10,7 +10,7 @@
  *   router.post('/', protect, requireRole('teacher'), createSubject)
  *
  * Usage (multiple roles):
- *   router.post('/', protect, requireRole(['teacher', 'admin']), createTemplate)
+ *   router.post('/', protect, requireRole(['teacher']), createTemplate)
  *
  * req.user.role comes from the decoded JWT — set in protect middleware.
  */

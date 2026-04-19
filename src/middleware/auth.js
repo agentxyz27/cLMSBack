@@ -26,6 +26,7 @@ const protect = (req, res, next) => {
   try {
     // Verify token and attach decoded payload to req.user
     // decoded contains: { id, role, iat, exp }
+    // for teachers: also contains { isAdmin }
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
     next() // pass control to the next middleware or controller

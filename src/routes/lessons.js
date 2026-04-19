@@ -24,7 +24,7 @@ const {
 
 router.post('/', protect, createLesson)
 router.get('/lesson/:id', protect, getLesson)   // specific route first
-router.get('/:subjectId', protect, getLessons)  // generic param route second
+router.get('/:classRoomId', protect, getLessons)  // generic param route second
 router.put('/:id', protect, updateLesson)
 router.delete('/:id', protect, deleteLesson)
 

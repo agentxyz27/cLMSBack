@@ -58,18 +58,21 @@ const completeLesson = async (req, res) => {
 const getProgress = async (req, res) => {
   try {
     const studentId = req.user.id
-
     const progress = await prisma.progress.findMany({
       where: { studentId },
       include: {
         lesson: {
           include: {
-            subject: true // include subject so student knows which subject the lesson belongs to
+            classRoom: {
+              include: {
+                subject: { select: { id: true, name: true } },
+                section: { select: { id: true, name: true } }
+              }
+            }
           }
         }
       }
     })
-
     res.json(progress)
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
