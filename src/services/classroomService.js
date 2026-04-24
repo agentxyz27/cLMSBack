@@ -71,6 +71,7 @@ const getMyClassRooms = async (teacherId) => {
 /**
  * Returns a single classroom by ID.
  * Only the owning teacher can access it.
+ * thumbnails for all lessons included for display in the classroom view.
  */
 const getClassRoom = async (teacherId, classRoomId) => {
   const classRoom = await prisma.classRoom.findUnique({
@@ -85,7 +86,14 @@ const getClassRoom = async (teacherId, classRoomId) => {
         }
       },
       lessons: {
-        select: { id: true, title: true, createdAt: true, updatedAt: true },
+        select: {
+          id: true,
+          title: true,
+          classRoomId: true,
+          contentJson: true,
+          createdAt: true,
+          updatedAt: true
+        },
         orderBy: { createdAt: 'asc' }
       }
     }
@@ -116,13 +124,21 @@ const getSectionClassRooms = async (sectionId) => {
 /**
  * Returns all lessons in a classroom.
  * Verifies the classroom belongs to the student's section.
+ * content json: on
  */
 const getClassRoomLessons = async (sectionId, classRoomId) => {
   const classRoom = await prisma.classRoom.findUnique({
     where: { id: parseInt(classRoomId) },
     include: {
       lessons: {
-        select: { id: true, title: true, createdAt: true, updatedAt: true },
+        select: {
+          id: true,
+          title: true,
+          classRoomId: true,
+          contentJson: true,
+          createdAt: true,
+          updatedAt: true
+        },
         orderBy: { createdAt: 'asc' }
       }
     }
@@ -134,4 +150,25 @@ const getClassRoomLessons = async (sectionId, classRoomId) => {
   return classRoom.lessons
 }
 
-module.exports = { createClassRoom, getMyClassRooms, getClassRoom, getSectionClassRooms, getClassRoomLessons }
+// Helper for getClassRoomLessons to verify access and return classroom details for a student
+const getClassRoomForStudent = async (sectionId, classRoomId) => {
+  const classRoom = await prisma.classRoom.findUnique({
+    where: { id: parseInt(classRoomId) },
+    include: {
+      subject: { select: { id: true, name: true } },
+      section: {
+        select: {
+          id: true,
+          name: true,
+          grade: { select: { id: true, level: true } }
+        }
+      },
+      teacher: { select: { id: true, name: true } }
+    }
+  })
+  if (!classRoom) throw { status: 404, message: 'Classroom not found' }
+  if (classRoom.sectionId !== sectionId) throw { status: 403, message: 'Access denied' }
+  return classRoom
+}
+
+module.exports = { createClassRoom, getMyClassRooms, getClassRoom, getSectionClassRooms, getClassRoomLessons, getClassRoomForStudent }

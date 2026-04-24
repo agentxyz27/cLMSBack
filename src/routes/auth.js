@@ -22,12 +22,12 @@ const {
 } = require('../controllers/authController')
 
 // Teacher auth
-router.post('/register', registerTeacher)
-router.post('/login', loginTeacher)
+router.post('/register/teacher', registerTeacher)
+router.post('/login/teacher', loginTeacher)
 
 // Student auth
-router.post('/student/register', registerStudent)
-router.post('/student/login', loginStudent)
+router.post('/register/student', registerStudent)
+router.post('/login/student', loginStudent)
 
 // Profile — requires valid token, works for all roles
 router.get('/me', protect, getMe)

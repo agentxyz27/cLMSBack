@@ -45,6 +45,7 @@ const getPublicTemplates = async () => {
       isPublic: true,
       usageCount: true,
       createdAt: true,
+      contentJson: true,
       teacher: { select: { id: true, name: true } }
     },
     orderBy: { usageCount: 'desc' }
