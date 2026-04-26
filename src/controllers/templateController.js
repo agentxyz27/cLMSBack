@@ -4,12 +4,13 @@
  * createTemplate     → teacher creates a template
  * getPublicTemplates → browse all public templates
  * getMyTemplates     → teacher sees their own templates
+ * getTemplate        → get single template with full graph
  * updateTemplate     → teacher updates their template
+ * publishTemplate    → teacher toggles isPublic
  * deleteTemplate     → teacher deletes their template
- * useTemplate        → duplicate template into a new lesson
+ * useTemplate        → clone template into a new lesson
  */
 const templateService = require('../services/templateService')
-
 
 const createTemplate = async (req, res) => {
   try {
@@ -56,7 +57,6 @@ const updateTemplate = async (req, res) => {
   }
 }
 
-// Optional: publish/unpublish template (toggle isPublic)
 const publishTemplate = async (req, res) => {
   try {
     const template = await templateService.publishTemplate(
@@ -94,7 +94,7 @@ module.exports = {
   getPublicTemplates,
   getMyTemplates,
   updateTemplate,
+  publishTemplate,
   deleteTemplate,
-  useTemplate,
-  publishTemplate
+  useTemplate
 }

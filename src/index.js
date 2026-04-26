@@ -31,7 +31,7 @@ const templateRoutes = require('./routes/templates')
 
 app.use('/api/auth', authRoutes)          // teacher/student auth
 app.use('/api/sections', sectionRoutes)   //sections for registration form
-app.use('/api/classrooms', classroomRoutes)   //classrooms
+app.use('/api', classroomRoutes)
 app.use('/api/lessons', lessonRoutes)     //lessons
 app.use('/api/progress', progressRoutes)  //progress
 app.use('/api/gamification', gamificationRoutes)

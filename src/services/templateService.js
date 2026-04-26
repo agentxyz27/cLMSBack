@@ -1,43 +1,64 @@
 /**
  * templateService.js
  *
- * Handles template business logic.
- * Templates are reusable canvas layouts owned by teachers.
- * Public templates are visible to all teachers.
- * Duplicating a template creates a new lesson under a classroom.
+ * Templates are now FULL LESSON BLUEPRINTS.
+ * They use the exact same structure as lessons:
+ *
+ * {
+ *   nodes: LessonNode[],
+ *   settings: LessonSettings
+ * }
+ *
+ * No conversion layer exists anymore.
+ * Templates are directly reusable lessons.
  */
+
 const prisma = require('../prisma')
 
 /**
- * Creates a new template owned by the logged-in teacher.
+ * Create template (must already be a valid lesson graph)
  */
 const createTemplate = async (teacherId, { title, contentJson, isPublic }) => {
-  return await prisma.template.create({
+  // Optional: basic validation guard (prevents broken saves)
+  if (!contentJson?.nodes || !Array.isArray(contentJson.nodes)) {
+    throw { status: 400, message: 'Template must contain nodes[] (lesson graph format)' }
+  }
+
+  return prisma.template.create({
     data: {
       title,
-      contentJson,
+      contentJson, // FULL LESSON GRAPH
       isPublic: isPublic ?? false,
       teacherId
     }
   })
 }
 
-
+/**
+ * Get single template
+ */
 const getTemplate = async (templateId) => {
   const template = await prisma.template.findUnique({
     where: { id: parseInt(templateId) },
-    include: { teacher: { select: { id: true, name: true } } }
+    include: {
+      teacher: {
+        select: { id: true, name: true }
+      }
+    }
   })
-  if (!template) throw { status: 404, message: 'Template not found' }
+
+  if (!template) {
+    throw { status: 404, message: 'Template not found' }
+  }
+
   return template
 }
 
 /**
- * Returns all public templates for browsing.
- * Includes owner name for attribution.
+ * Get all public templates
  */
 const getPublicTemplates = async () => {
-  return await prisma.template.findMany({
+  return prisma.template.findMany({
     where: { isPublic: true },
     select: {
       id: true,
@@ -45,18 +66,20 @@ const getPublicTemplates = async () => {
       isPublic: true,
       usageCount: true,
       createdAt: true,
-      contentJson: true,
-      teacher: { select: { id: true, name: true } }
+      contentJson: true, // FULL LESSON GRAPH
+      teacher: {
+        select: { id: true, name: true }
+      }
     },
     orderBy: { usageCount: 'desc' }
   })
 }
 
 /**
- * Returns all templates owned by the logged-in teacher.
+ * Get teacher's templates
  */
 const getMyTemplates = async (teacherId) => {
-  return await prisma.template.findMany({
+  return prisma.template.findMany({
     where: { teacherId },
     select: {
       id: true,
@@ -71,87 +94,99 @@ const getMyTemplates = async (teacherId) => {
 }
 
 /**
- * Updates a template's title, contentJson, or isPublic.
- * Only the owning teacher can update.
+ * Update template (FULL GRAPH EDITING)
  */
 const updateTemplate = async (teacherId, templateId, { title, contentJson, isPublic }) => {
   const template = await prisma.template.findUnique({
     where: { id: parseInt(templateId) }
   })
+
   if (!template) throw { status: 404, message: 'Template not found' }
   if (template.teacherId !== teacherId) throw { status: 403, message: 'Access denied' }
 
   const data = {}
+
   if (title !== undefined) data.title = title
-  if (contentJson !== undefined) data.contentJson = contentJson
+  if (contentJson !== undefined) {
+    if (!contentJson?.nodes || !Array.isArray(contentJson.nodes)) {
+      throw { status: 400, message: 'Invalid lesson graph format' }
+    }
+    data.contentJson = contentJson
+  }
   if (isPublic !== undefined) data.isPublic = isPublic
 
-  return await prisma.template.update({ where: { id: parseInt(templateId) }, data })
+  return prisma.template.update({
+    where: { id: parseInt(templateId) },
+    data
+  })
 }
 
 /**
- * Toggles the public visibility of a template.
- * Only the owning teacher can publish/unpublish.
+ * Publish / unpublish template
  */
 const publishTemplate = async (teacherId, templateId, isPublic) => {
   const template = await prisma.template.findUnique({
     where: { id: parseInt(templateId) }
   })
+
   if (!template) throw { status: 404, message: 'Template not found' }
   if (template.teacherId !== teacherId) throw { status: 403, message: 'Access denied' }
 
-  return await prisma.template.update({
+  return prisma.template.update({
     where: { id: parseInt(templateId) },
     data: { isPublic }
   })
 }
 
-
 /**
- * Deletes a template.
- * Only the owning teacher can delete.
+ * Delete template
  */
 const deleteTemplate = async (teacherId, templateId) => {
   const template = await prisma.template.findUnique({
     where: { id: parseInt(templateId) }
   })
+
   if (!template) throw { status: 404, message: 'Template not found' }
   if (template.teacherId !== teacherId) throw { status: 403, message: 'Access denied' }
 
-  await prisma.template.delete({ where: { id: parseInt(templateId) } })
+  await prisma.template.delete({
+    where: { id: parseInt(templateId) }
+  })
 }
 
 /**
- * Duplicates a template into a new lesson under a classroom.
- * Verifies the classroom belongs to the logged-in teacher.
- * Increments usageCount on the template.
+ * Use template → directly becomes a lesson (NO TRANSFORMATION)
  */
 const useTemplate = async (teacherId, templateId, { classRoomId, title }) => {
   const template = await prisma.template.findUnique({
     where: { id: parseInt(templateId) }
   })
+
   if (!template) throw { status: 404, message: 'Template not found' }
 
-  // Verify classroom belongs to this teacher
   const classRoom = await prisma.classRoom.findUnique({
     where: { id: parseInt(classRoomId) }
   })
-  if (!classRoom) throw { status: 404, message: 'Classroom not found' }
-  if (classRoom.teacherId !== teacherId) throw { status: 403, message: 'Access denied' }
 
-  // Create new lesson from template canvas
+  if (!classRoom) throw { status: 404, message: 'Classroom not found' }
+  if (classRoom.teacherId !== teacherId) {
+    throw { status: 403, message: 'Access denied' }
+  }
+
+  // Direct clone (this is now safe because formats are identical)
   const lesson = await prisma.lesson.create({
     data: {
       title: title || template.title,
-      contentJson: template.contentJson,
-      classRoomId: parseInt(classRoomId)
+      classRoomId: parseInt(classRoomId),
+      contentJson: template.contentJson
     }
   })
 
-  // Increment usage count
   await prisma.template.update({
     where: { id: parseInt(templateId) },
-    data: { usageCount: { increment: 1 } }
+    data: {
+      usageCount: { increment: 1 }
+    }
   })
 
   return lesson

@@ -1,32 +1,75 @@
-/**
- * classroomRoutes.js
- *
- * All routes require authentication.
- * Only teachers can create and access classrooms.
- */
 const express = require('express')
 const router = express.Router()
 const protect = require('../middleware/auth')
 const requireRole = require('../middleware/requireRole')
-const { createClassRoom, getMyClassRooms, getClassRoom, getSectionClassRooms, getClassRoomLessons, getClassRoomForStudent } = require('../controllers/classroomController')
 
-// For teachers to create a classroom by selecting a subject and section they teach
-router.post('/', protect, requireRole('teacher'), createClassRoom)
+const {
+  createClassRoom,
+  getMyClassRooms,
+  getClassRoom,
+  getSectionClassRooms,
+  getClassRoomLessons,
+  getClassRoomForStudent
+} = require('../controllers/classroomController')
 
-// For teachers to get all their classrooms with subject and section info
-router.get('/mine', protect, requireRole('teacher'), getMyClassRooms)
+/**
+ * =========================
+ * TEACHER ROUTES
+ * =========================
+ */
 
-// For teachers to get a single classroom by ID, including its lessons
-router.get('/my-section', protect, requireRole('student'), getSectionClassRooms)
+// Create classroom
+router.post(
+  '/teacher/classrooms',
+  protect,
+  requireRole('teacher'),
+  createClassRoom
+)
 
-// For students to access a classroom by ID, but only if it belongs to their section
-router.get('/:id/student', protect, requireRole('student'), getClassRoomForStudent)
+// Get all teacher classrooms
+router.get(
+  '/teacher/classrooms',
+  protect,
+  requireRole('teacher'),
+  getMyClassRooms
+)
 
-// For students to get all lessons for a classroom, but only if it belongs to their section
-router.get('/:id/lessons', protect, requireRole('student'), getClassRoomLessons)
+// Get single teacher classroom (full access)
+router.get(
+  '/teacher/classrooms/:id',
+  protect,
+  requireRole('teacher'),
+  getClassRoom
+)
 
-// For teachers to get a single classroom by ID, including its lessons
-router.get('/:id', protect, requireRole('teacher'), getClassRoom)
+/**
+ * =========================
+ * STUDENT ROUTES
+ * =========================
+ */
 
+// Get all classrooms for student's section
+router.get(
+  '/student/classrooms',
+  protect,
+  requireRole('student'),
+  getSectionClassRooms
+)
+
+// Get single classroom (student-safe view)
+router.get(
+  '/student/classrooms/:id',
+  protect,
+  requireRole('student'),
+  getClassRoomForStudent
+)
+
+// Get lessons for a classroom (student-safe)
+router.get(
+  '/student/classrooms/:id/lessons',
+  protect,
+  requireRole('student'),
+  getClassRoomLessons
+)
 
 module.exports = router
