@@ -23,6 +23,7 @@ app.get('/api/health', (req, res) => {
 // ========================
 const authRoutes = require('./routes/auth')
 const sectionRoutes = require('./routes/section')
+const subjectRoutes = require('./routes/subject')
 const classroomRoutes = require('./routes/classroom')
 const lessonRoutes = require('./routes/lessons')
 const progressRoutes = require('./routes/progress')
@@ -30,6 +31,7 @@ const gamificationRoutes = require('./routes/gamification')
 const templateRoutes = require('./routes/templates')
 
 app.use('/api/auth', authRoutes)          // teacher/student auth
+app.use('/api/subjects', subjectRoutes)
 app.use('/api/sections', sectionRoutes)   //sections for registration form
 app.use('/api', classroomRoutes)
 app.use('/api/lessons', lessonRoutes)     //lessons
