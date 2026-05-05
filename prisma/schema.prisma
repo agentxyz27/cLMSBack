@@ -1,50 +1,114 @@
 /**
- * Prisma Schema
- *
- * Database: PostgreSQL (Supabase)
- * ORM: Prisma 7
- *
- * Models:
- * - Grade        → represents a grade level (e.g. Grade 4); created by dev/admin only
- * - Section      → a named group of students under a grade (e.g. "Ichigo"); created by dev/admin only
- * - Teacher      → manages classrooms and lessons; can have admin privileges
- * - Student      → belongs to one section; tracks progress through lessons
- * - Subject      → predetermined by the system; seeded by dev; Math is unlocked, others locked
- * - ClassRoom    → links a teacher, subject, and section; teacher self-assigns
- * - Lesson       → individual learning unit under a classroom, stored as canvas JSON
- * - Template     → reusable canvas layout, owned by a teacher
- * - Badge        → milestone rewards defined by the system
- * - Progress     → tracks student completion and score per lesson
- * - StudentBadge → tracks which student earned which badge
- *
- * Changes from previous schema:
- * - Grade model added — parent of Section; dev/admin only
- * - Section model added — replaces direct grade field on Student
- * - ClassRoom model added — links Teacher + Subject + Section; replaces Subject ownership by teacher
- * - Subject redesigned — no longer owned by a teacher; seeded by dev; isLocked controls access
- * - Lesson moved — now belongs to ClassRoom instead of Subject
- * - Student.sectionId added — every student belongs to exactly one section
- * - Enrollment model removed — section membership replaces individual enrollment
- * - Teacher.subjects relation removed — teachers no longer own subjects directly
- *
- * Admin access is a privilege, not a separate role.
- * Teachers with isAdmin: true are granted elevated access by the dev directly in the database.
- * isAdmin is carried in the JWT and checked by middleware on protected routes.
- *
- * Subject list (seeded, not user-created):
- * - Mathematics         → unlocked
- * - Science             → locked (Grade 3+, future)
- * - English             → locked
- * - Filipino            → locked
- * - Araling Panlipunan  → locked
- * - GMRC/Values Ed      → locked
- * - MAPEH               → locked
- *
- * Model ordering follows the dependency chain:
- *   Independent models first → dependent models next → junction tables last
- *
- * IDs use auto increment integers for simplicity and easier debugging.
- * Foreign keys use Int to match.
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║                         CLMS — Prisma Schema                           ║
+ * ║          Gamified Learning Management System for Philippine Schools     ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ * Database : PostgreSQL (Supabase)
+ * ORM      : Prisma 7
+ * Stack    : Node.js + Express + React + Vite
+ * ── CORE PHILOSOPHY ───────────────────────────────────────────────────────
+ * This is a data-driven application.
+ * Every model either PRODUCES data or CONSUMES data.
+ * Nothing in this schema is decorative.
+ * Data flows in one direction:
+ * Student plays lesson
+ * → QuestionAttemptEvent     (raw behavioral log — immutable)
+ * → QuestionAttemptSession   (summary per student per question)
+ * → StudentLessonSnapshot    (MPS snapshot per student per lesson)
+ * Teacher triggers "Generate Report"
+ * → ClassLessonSnapshot      (MPS snapshot per classroom per lesson)
+ * Teacher reads dashboard
+ * ← All four snapshot/session tables feed the 4 engines
+ * ── THE 4 ENGINES ─────────────────────────────────────────────────────────
+ * Detection Engine
+ * Source : QuestionAttemptSession, StudentLessonSnapshot
+ * Output : at-risk students, weak questions, regression alerts
+ * Charts : scatter (avgAttempts vs mps), stacked bar (attempts + hints)
+ * Focus Engine
+ * Source : StudentLessonSnapshot (isAtRisk, mps, avgAttempts)
+ * Output : priority-ranked student list, class weak spots
+ * Charts : bar (student ranking by mps), histogram (class MPS distribution)
+ * Template Engine
+ * Source : StudentLessonSnapshot, Topic, Template
+ * Output : remedial activity assigned to student via AssignedActivity
+ * Action : "Assign Remediation" button → creates AssignedActivity
+ * Progress Engine
+ * Source : ClassLessonSnapshot (over time), StudentLessonSnapshot (over time)
+ * Output : MPS trend, improvement after remediation
+ * Charts : line (class MPS over time), heatmap (student × lesson MPS grid)
+ * ── CHART → DATA SOURCE MAP ───────────────────────────────────────────────
+ * Heatmap        ← StudentLessonSnapshot   who × lesson × MPS
+ * Line chart     ← ClassLessonSnapshot     class MPS over time
+ * Stacked bar    ← QuestionAttemptSession  attempts + hints per question
+ * Bar ranking    ← StudentLessonSnapshot   students sorted by MPS ascending
+ * Histogram      ← StudentLessonSnapshot   MPS distribution across class
+ * Scatter        ← StudentLessonSnapshot   avgAttempts vs mps per student
+ * ── CALL TO ACTION → DATA TRIGGER MAP ────────────────────────────────────
+ * "Assign Remediation" → reads  StudentLessonSnapshot.isAtRisk
+ * → reads  Topic (from Question.topicId)
+ * → reads  Template (matched by topic + difficulty)
+ * → writes AssignedActivity
+ * "Generate Report"    → reads  QuestionAttemptSession (all students in classroom)
+ * → reads  StudentLessonSnapshot (all students in classroom)
+ * → writes ClassLessonSnapshot
+ * ── MPS DEFINITION ────────────────────────────────────────────────────────
+ * MPS = (correctCount / totalQuestions) * 100
+ * Stored as Float (0.00 – 100.00).
+ * Computed at snapshot time from QuestionAttemptSession records.
+ * Never recomputed after snapshot — snapshots are immutable history.
+ * ── AT-RISK THRESHOLD ─────────────────────────────────────────────────────
+ * isAtRisk = mps < 75
+ * Based on DepEd mastery threshold for elementary.
+ * Stored as Boolean on StudentLessonSnapshot at snapshot time.
+ * Never recomputed — query WHERE isAtRisk = true for Focus Engine.
+ * ── GAMIFICATION VS ANALYTICS SEPARATION ─────────────────────────────────
+ * Progress.score    → gamification score only (feeds XP calculation)
+ * Progress.xpEarned → XP awarded for completing the lesson
+ * StudentLessonSnapshot.mps → academic MPS (feeds all 4 engines)
+ * These two must never be confused or combined.
+ * ── WHO CREATES WHAT ──────────────────────────────────────────────────────
+ * Dev / Admin only  : Grade, Section, Subject, Topic, Badge
+ * Teacher           : ClassRoom, Lesson, Question, Template, AssignedActivity
+ * Student           : QuestionAttemptSession, QuestionAttemptEvent (via gameplay)
+ * System (auto)     : Progress, StudentLessonSnapshot (on lesson completion)
+ * System (trigger)  : ClassLessonSnapshot (on teacher "Generate Report")
+ * ── ADMIN ACCESS ──────────────────────────────────────────────────────────
+ * Admin is a privilege, not a role.
+ * Teacher.isAdmin = true → granted by dev directly in the database.
+ * isAdmin is embedded in JWT and checked by restrictTo middleware.
+ * ── SUBJECT LIST (seeded) ─────────────────────────────────────────────────
+ * Mathematics        → unlocked (prototype)
+ * Science            → locked
+ * English            → locked
+ * Filipino           → locked
+ * Araling Panlipunan → locked
+ * GMRC / Values Ed   → locked
+ * MAPEH              → locked
+ * ── TEMPLATE INTERACTION TYPES ────────────────────────────────────────────
+ * DRAG_MATCH       → drag items to correct targets
+ * FILL_STEP        → fill in a missing step in a sequence
+ * VISUAL_GROUPING  → sort items into correct groups
+ * NUMBER_LINE      → place a value on a number line
+ * ── CASCADE RULES ─────────────────────────────────────────────────────────
+ * Grade deleted       → cascades to Section
+ * Section deleted     → cascades to Student, ClassRoom
+ * Teacher deleted     → cascades to ClassRoom; SetNull on Template, ClassLessonSnapshot, AssignedActivity
+ * Student deleted     → cascades to Progress, QuestionAttemptSession, StudentLessonSnapshot,
+ * StudentBadge, AssignedActivity
+ * Subject deleted     → cascades to Topic, ClassRoom
+ * Topic deleted       → cascades to Question; SetNull on Template, AssignedActivity
+ * ClassRoom deleted   → cascades to Lesson, ClassLessonSnapshot
+ * Lesson deleted      → cascades to Question, Progress, StudentLessonSnapshot, ClassLessonSnapshot
+ * Question deleted    → cascades to QuestionAttemptSession
+ * Session deleted     → cascades to QuestionAttemptEvent
+ * Template deleted    → cascades to AssignedActivity
+ * Snapshot deleted    → SetNull on AssignedActivity.sourceSnapshotId
+ * ── ID DESIGN ─────────────────────────────────────────────────────────────
+ * Auto-increment integers throughout.
+ * Easier to debug than UUIDs.
+ * Display on frontend as: String(id).padStart(12, '0')
+ * ── MODEL ORDER ───────────────────────────────────────────────────────────
+ * Independent → Dependent → Junction / Data → Snapshot → Badge
  */
 
 generator client {
@@ -55,11 +119,40 @@ datasource db {
   provider = "postgresql"
 }
 
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+// Interaction type for Question and Template.
+// Determines which frontend component renders the question.
+enum TemplateType {
+  DRAG_MATCH // drag items to correct targets
+  FILL_STEP // fill in a missing step in a sequence
+  VISUAL_GROUPING // sort items into correct groups
+  NUMBER_LINE // place a value on a number line
+}
+
+// Lifecycle status of a remedial activity assigned to a student.
+enum AssignmentStatus {
+  ASSIGNED // created, student has not started
+  IN_PROGRESS // student has opened it
+  COMPLETED // student submitted final answer
+  ARCHIVED // teacher dismissed or expired
+}
+
+// Event types recorded during a student's attempt session on a question.
+// These are the atomic behavioral signals — the rawest layer of data.
+enum AttemptEventType {
+  SESSION_STARTED // student opened the question
+  HINT_OPENED // student requested a hint
+  ANSWER_CHANGED // student changed their answer without submitting
+  ATTEMPT_SUBMITTED // student submitted an answer (may be wrong)
+  SESSION_FINISHED // student submitted the final correct answer or gave up
+}
+
 // ── Independent Models ─────────────────────────────────────────────────────
 
 // Grade levels (e.g. Grade 4, Grade 5, Grade 6).
-// Created by dev/admin only — never by teachers or students.
-// Sections live under a grade.
+// Created by dev/admin only.
+// Parent of Section.
 model Grade {
   id        Int       @id @default(autoincrement())
   level     Int       @unique // e.g. 4, 5, 6
@@ -67,93 +160,140 @@ model Grade {
   createdAt DateTime  @default(now())
 }
 
-// A named group of students under a grade (e.g. "Ichigo" under Grade 4).
+// Named group of students under a grade (e.g. "Ichigo" under Grade 4).
 // Created by dev/admin only.
-// Students pick their section during registration.
+// Students pick their section at registration.
 // ClassRooms are linked to sections when a teacher self-assigns.
 model Section {
-  id         Int        @id @default(autoincrement())
-  name       String     // e.g. "Ichigo", "Naruto", "Luffy"
-  grade      Grade      @relation(fields: [gradeId], references: [id])
+  id         Int         @id @default(autoincrement())
+  name       String // e.g. "Ichigo", "Naruto", "Luffy"
+  grade      Grade       @relation(fields: [gradeId], references: [id], onDelete: Cascade)
   gradeId    Int
   students   Student[]
   classRooms ClassRoom[]
-  createdAt  DateTime   @default(now())
-
-  @@unique([gradeId, name]) // no duplicate section names within the same grade
-}
-
-model Teacher {
-  id         Int         @id @default(autoincrement())
-  name       String
-  email      String      @unique
-  password   String      // stored as bcrypt hash, never plain text
-  isAdmin    Boolean     @default(false) // privilege flag — granted by dev directly in the database
-  classRooms ClassRoom[]
-  templates  Template[]
   createdAt  DateTime    @default(now())
+
+  @@unique([gradeId, name])
+  @@index([gradeId])
 }
 
+// Teachers manage classrooms, lessons, questions, and templates.
+// isAdmin is a privilege flag — granted by dev directly in the database.
+// isAdmin is embedded in JWT and checked by restrictTo middleware.
+model Teacher {
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  password             String // bcrypt hash — never plain text
+  isAdmin              Boolean               @default(false)
+  classRooms           ClassRoom[]
+  templates            Template[]
+  assignedActivities   AssignedActivity[] // activities this teacher assigned
+  classLessonSnapshots ClassLessonSnapshot[] // reports this teacher triggered
+  createdAt            DateTime              @default(now())
+}
+
+// Students belong to exactly one section.
+// Two data layers attached:
+//   progress          → gamification (XP, level, completion)
+//   attemptSessions   → behavioral data (the raw input for all 4 engines)
+//   studentSnapshots  → analytics (MPS per lesson over time)
 model Student {
-  id        Int            @id @default(autoincrement())
-  name      String
-  lrn       String         @unique // 12-digit Learner Reference Number, stored as string
-  email     String         @unique
-  password  String         // stored as bcrypt hash, never plain text
-  xp        Int            @default(0) // total experience points earned
-  level     Int            @default(1) // level up every 100 XP
-  section   Section        @relation(fields: [sectionId], references: [id])
-  sectionId Int            // every student belongs to exactly one section
-  progress  Progress[]
-  badges    StudentBadge[]
-  createdAt DateTime       @default(now())
+  id                     Int                      @id @default(autoincrement())
+  name                   String
+  lrn                    String                   @unique // 12-digit Learner Reference Number
+  email                  String                   @unique
+  password               String // bcrypt hash — never plain text
+  xp                     Int                      @default(0)
+  level                  Int                      @default(1)
+  section                Section                  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId              Int
+  progress               Progress[] // gamification records
+  badges                 StudentBadge[]
+  attemptSessions        QuestionAttemptSession[] // behavioral data — source of truth
+  studentLessonSnapshots StudentLessonSnapshot[] // MPS snapshots per lesson
+  assignedActivities     AssignedActivity[] // remediation assigned to this student
+  createdAt              DateTime                 @default(now())
+
+  @@index([sectionId])
 }
 
-// Predetermined by the system — never created by teachers.
-// Seeded by dev via prisma/seed.ts.
-// isLocked controls whether teachers can create classrooms under this subject.
+// System-seeded subjects — never created by teachers.
+// isLocked controls whether teachers can open classrooms under this subject.
 // Only Mathematics is unlocked for the prototype.
 model Subject {
-  id         Int         @id @default(autoincrement())
-  name       String      @unique // e.g. "Mathematics", "Science"
+  id          Int         @id @default(autoincrement())
+  name        String      @unique // e.g. "Mathematics", "Science"
   description String
-  isLocked   Boolean     @default(true) // false = Math only for now
-  classRooms ClassRoom[]
-  createdAt  DateTime    @default(now())
+  isLocked    Boolean     @default(true)
+  topics      Topic[]
+  classRooms  ClassRoom[]
+  createdAt   DateTime    @default(now())
 }
 
+// Topic or skill under a subject (e.g. "Fractions", "Addition").
+// Created by dev/admin only — never by teachers.
+// Predefined so Detection Engine can consistently tag weakness per topic
+// across all classrooms. Free-form teacher topics would create inconsistency.
+// prerequisiteTopic creates a simple learning progression chain.
+// Questions are tagged to a topic — this is what makes weakness detection granular.
+model Topic {
+  id                  Int                @id @default(autoincrement())
+  name                String
+  subject             Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId           Int
+  prerequisiteTopic   Topic?             @relation("TopicPrerequisite", fields: [prerequisiteTopicId], references: [id], onDelete: SetNull)
+  prerequisiteTopicId Int?
+  dependentTopics     Topic[]            @relation("TopicPrerequisite")
+  questions           Question[] // questions tagged to this topic
+  templates           Template[] // templates mapped to this topic
+  assignedActivities  AssignedActivity[] @relation("AssignedActivityTopic")
+  createdAt           DateTime           @default(now())
+
+  @@unique([subjectId, name])
+  @@index([subjectId])
+  @@index([prerequisiteTopicId])
+}
+
+// Badge milestones — system-seeded by dev.
+// xpRequired is the XP threshold a student must reach to earn this badge.
 model Badge {
   id          Int            @id @default(autoincrement())
   name        String         @unique
   description String
-  xpRequired  Int            // minimum XP needed to earn this badge
+  xpRequired  Int
   students    StudentBadge[]
   createdAt   DateTime       @default(now())
 }
 
 // ── Dependent Models ───────────────────────────────────────────────────────
 
-// Links a teacher, subject, and section together.
+// Links a Teacher, Subject, and Section.
 // Created when a teacher self-assigns to teach a subject to a section.
 // One teacher per subject per section — enforced by unique constraint.
-// Lessons live under a classroom, not directly under a subject.
+// All lessons, questions, and classroom-level data flow from here.
 model ClassRoom {
-  id        Int       @id @default(autoincrement())
-  teacher   Teacher   @relation(fields: [teacherId], references: [id])
-  teacherId Int
-  subject   Subject   @relation(fields: [subjectId], references: [id])
-  subjectId Int
-  section   Section   @relation(fields: [sectionId], references: [id])
-  sectionId Int
-  lessons   Lesson[]
-  createdAt DateTime  @default(now())
+  id                   Int                   @id @default(autoincrement())
+  teacher              Teacher               @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId            Int
+  subject              Subject               @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId            Int
+  section              Section               @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId            Int
+  lessons              Lesson[]
+  classLessonSnapshots ClassLessonSnapshot[]
+  createdAt            DateTime              @default(now())
 
-  @@unique([teacherId, subjectId, sectionId]) // one teacher per subject per section
+  @@unique([teacherId, subjectId, sectionId])
+  @@index([teacherId])
+  @@index([subjectId])
+  @@index([sectionId])
 }
 
-// Individual learning unit under a classroom, stored as canvas JSON.
-// contentJson is nullable — a lesson can exist with no content yet (blank canvas).
-// updatedAt tracks the last save, used for optimistic save feedback in the editor.
+// Individual learning unit under a ClassRoom.
+// contentJson stores the canvas layout — null means blank canvas not yet edited.
+// updatedAt is used for optimistic save feedback in the canvas editor.
+// questions are the interactive items students answer — source of all behavioral data.
 //
 // Canvas JSON shape:
 //   {
@@ -164,35 +304,95 @@ model ClassRoom {
 //     ]
 //   }
 model Lesson {
-  id          Int       @id @default(autoincrement())
-  title       String
-  contentJson Json?     // canvas JSON — null means blank canvas
-  classRoom   ClassRoom @relation(fields: [classRoomId], references: [id], onDelete: Cascade)
-  classRoomId Int
-  progress    Progress[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                     Int                     @id @default(autoincrement())
+  title                  String
+  contentJson            Json? // canvas JSON — null = blank canvas
+  classRoom              ClassRoom               @relation(fields: [classRoomId], references: [id], onDelete: Cascade)
+  classRoomId            Int
+  questions              Question[]
+  progress               Progress[]
+  studentLessonSnapshots StudentLessonSnapshot[]
+  classLessonSnapshots   ClassLessonSnapshot[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  @@index([classRoomId])
+}
+
+// Interactive question attached to a Lesson.
+// templateType determines which frontend interaction component renders.
+// topicId tags this question to a topic — enables per-topic weakness detection.
+// order defines sequence within the lesson.
+// contentJson stores the full teacher-configured question:
+//   - prompt text
+//   - interactive items / options
+//   - correct answer key (frontend validates — backend just records results)
+//   - hint content (revealed when student opens a hint)
+//
+// Example contentJson for DRAG_MATCH:
+//   {
+//     "prompt": "Match each fraction to its picture",
+//     "items": [{ "id": "a", "label": "1/2" }, { "id": "b", "label": "1/4" }],
+//     "targets": [{ "id": "t1", "accepts": "a" }, { "id": "t2", "accepts": "b" }],
+//     "hints": ["Look at how many parts are shaded", "Count the total pieces"]
+//   }
+model Question {
+  id              Int                      @id @default(autoincrement())
+  lesson          Lesson                   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId        Int
+  topic           Topic                    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId         Int
+  templateType    TemplateType
+  contentJson     Json // full question config including answer key and hints
+  order           Int // sequence position within the lesson (1-based)
+  attemptSessions QuestionAttemptSession[]
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([lessonId, order])
+  @@index([lessonId])
+  @@index([topicId])
 }
 
 // Reusable canvas layouts created and owned by teachers.
-// isPublic controls visibility in the global template library.
-// usageCount increments each time a teacher duplicates this template into a lesson.
-// teacherId is nullable to handle teacher deletion gracefully (SetNull on delete).
+// topicId maps the template to a specific topic for Template Engine matching.
+// difficulty controls which students get assigned this template (1 = easiest).
+// isPublic controls visibility in the shared template library.
+// usageCount increments each time a teacher uses this template in a question.
+// sourceTemplateId preserves duplication lineage — which template was this copied from.
 model Template {
-  id          Int      @id @default(autoincrement())
-  title       String
-  contentJson Json
-  isPublic    Boolean  @default(false)
-  usageCount  Int      @default(0)
-  teacher     Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
-  teacherId   Int?     // null if the owning teacher was deleted
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 Int                @id @default(autoincrement())
+  title              String
+  contentJson        Json // canvas layout JSON
+  topic              Topic              @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId            Int
+  difficulty         Int // 1 = easiest, scale TBD
+  interactionType    TemplateType
+  version            Int                @default(1)
+  isPublic           Boolean            @default(false)
+  usageCount         Int                @default(0)
+  teacher            Teacher?           @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  teacherId          Int? // null if owning teacher was deleted
+  sourceTemplate     Template?          @relation("TemplateLineage", fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  sourceTemplateId   Int? // null if original — not a copy
+  derivedTemplates   Template[]         @relation("TemplateLineage")
+  assignedActivities AssignedActivity[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([topicId])
+  @@index([teacherId])
+  @@index([interactionType])
+  @@index([sourceTemplateId])
+  @@index([topicId, difficulty]) // Template Engine query: find template by topic + difficulty
 }
 
-// ── Junction Tables ────────────────────────────────────────────────────────
+// ── Junction / Data Tables ─────────────────────────────────────────────────
 
-// Tracks student completion and score per lesson.
+// GAMIFICATION RECORD — not analytics.
+// Tracks XP earned and lesson completion per student per lesson.
+// score is the gamification score used only for XP calculation.
+// MPS lives in StudentLessonSnapshot — these two must never be confused.
 model Progress {
   id        Int      @id @default(autoincrement())
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -200,14 +400,195 @@ model Progress {
   lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   lessonId  Int
   completed Boolean  @default(false)
-  score     Int?     // optional — not all lessons have scores
+  score     Int? // gamification score — XP calculation only, not MPS
   xpEarned  Int      @default(0)
   createdAt DateTime @default(now())
 
-  @@unique([studentId, lessonId]) // prevent duplicate progress entries
+  @@unique([studentId, lessonId])
+  @@index([studentId])
+  @@index([lessonId])
 }
 
-// Tracks which student earned which badge and when.
+// BEHAVIORAL SUMMARY — one row per student per question.
+// Created when a student opens a question (SESSION_STARTED event).
+// Updated as the student progresses through the question.
+// Finalized when SESSION_FINISHED event is recorded.
+//
+// attempts    → how many ATTEMPT_SUBMITTED events occurred
+// hintsUsed   → how many HINT_OPENED events occurred
+// isSubmitted → true when SESSION_FINISHED — distinguishes unanswered from wrong
+// correct     → null until submitted; true or false after SESSION_FINISHED
+//              null = student has not finished this question yet
+//              false = student finished but got it wrong
+//              true = student finished and got it correct
+// sessionToken → unique ID for this session (used by frontend to resume if interrupted)
+model QuestionAttemptSession {
+  id           Int                    @id @default(autoincrement())
+  sessionToken String                 @unique @default(cuid())
+  question     Question               @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId   Int
+  student      Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    Int
+  attempts     Int                    @default(0) // count of ATTEMPT_SUBMITTED events
+  hintsUsed    Int                    @default(0) // count of HINT_OPENED events
+  isSubmitted  Boolean                @default(false) // true = SESSION_FINISHED recorded
+  correct      Boolean? // null = not yet finished; true/false = final result
+  startedAt    DateTime               @default(now())
+  submittedAt  DateTime? // set when SESSION_FINISHED is recorded
+  events       QuestionAttemptEvent[]
+
+  @@index([studentId])
+  @@index([questionId])
+  @@index([studentId, questionId])
+  @@index([startedAt])
+  @@index([submittedAt])
+}
+
+// RAW BEHAVIORAL LOG — the atomic data layer.
+// One row per event during a student's attempt session.
+// Immutable after write — never updated or deleted (except on cascade).
+// This is the ground truth that QuestionAttemptSession summarizes.
+//
+// eventType determines what happened:
+//   SESSION_STARTED   → student opened the question
+//   HINT_OPENED       → student requested a hint (which hint = payload.hintIndex)
+//   ANSWER_CHANGED    → student changed answer without submitting (payload.value)
+//   ATTEMPT_SUBMITTED → student submitted an answer (payload.correct, payload.value)
+//   SESSION_FINISHED  → final submission recorded (payload.correct)
+//
+// stepNumber → sequence within the session (1, 2, 3...)
+// payload    → flexible JSON for event-specific data (answer value, hint index, etc.)
+model QuestionAttemptEvent {
+  id         Int                    @id @default(autoincrement())
+  session    QuestionAttemptSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId  Int
+  eventType  AttemptEventType
+  stepNumber Int                    @default(1) // sequence within the session
+  payload    Json? // event-specific data
+  createdAt  DateTime               @default(now())
+
+  @@unique([sessionId, stepNumber])
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// REMEDIATION RECORD — teacher or system assigns a remedial activity to a student.
+// Created via the "Assign Remediation" call to action on the teacher dashboard.
+// Links back to the snapshot that triggered the assignment for audit trail.
+// status tracks the student's progress through the remediation lifecycle.
+// assignedById is nullable — future: system auto-assigns based on Detection Engine.
+// sourceTopicId — which topic weakness triggered this assignment.
+// sourceSnapshotId — which StudentLessonSnapshot flagged this student as at-risk.
+model AssignedActivity {
+  id               Int                    @id @default(autoincrement())
+  student          Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId        Int
+  template         Template               @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId       Int
+  assignedBy       Teacher?               @relation(fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedById     Int? // null = system auto-assigned (future)
+  sourceTopic      Topic?                 @relation("AssignedActivityTopic", fields: [sourceTopicId], references: [id], onDelete: SetNull)
+  sourceTopicId    Int? // which topic weakness triggered this
+  sourceSnapshot   StudentLessonSnapshot? @relation("AssignedActivitySnapshot", fields: [sourceSnapshotId], references: [id], onDelete: SetNull)
+  sourceSnapshotId Int? // which snapshot flagged this student
+  reason           String? // optional teacher note
+  status           AssignmentStatus       @default(ASSIGNED)
+  dueDate          DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([studentId])
+  @@index([templateId])
+  @@index([assignedById])
+  @@index([status])
+  @@index([sourceTopicId])
+  @@index([sourceSnapshotId])
+}
+
+// ── Snapshot Tables ────────────────────────────────────────────────────────
+
+// STUDENT-LEVEL MPS SNAPSHOT.
+// Auto-generated when a student answers all questions in a lesson (lesson completion trigger).
+// Computed from QuestionAttemptSession records at that moment.
+// Immutable after creation — snapshots are permanent historical records.
+//
+// mps          = (correctCount / totalQuestions) * 100
+// isAtRisk     = mps < 75 — stored at snapshot time, never recomputed
+// avgAttempts  = average attempts across all questions
+// avgHintsUsed = average hints used across all questions
+//
+// Feeds:
+//   Detection Engine → isAtRisk, mps, avgAttempts (scatter chart)
+//   Focus Engine     → sorted by mps ascending (bar ranking, histogram)
+//   Progress Engine  → mps over time per student (line chart)
+//   Heatmap          → student × lesson grid
+model StudentLessonSnapshot {
+  id                 Int                @id @default(autoincrement())
+  student            Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId          Int
+  lesson             Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId           Int
+  totalQuestions     Int // total questions in the lesson at snapshot time
+  correctCount       Int // questions the student got correct
+  mps                Float // (correctCount / totalQuestions) * 100
+  avgAttempts        Float // average attempts per question
+  avgHintsUsed       Float // average hints used per question
+  isAtRisk           Boolean // true if mps < 75 (DepEd mastery threshold)
+  snapshotAt         DateTime           @default(now())
+  assignedActivities AssignedActivity[] @relation("AssignedActivitySnapshot")
+
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([snapshotAt])
+  @@index([isAtRisk]) // Focus Engine: WHERE isAtRisk = true
+}
+
+// CLASS-LEVEL MPS SNAPSHOT.
+// Generated on teacher trigger ("Generate Report" button in dashboard).
+// Aggregates StudentLessonSnapshot records for the classroom + lesson at that moment.
+// No unique constraint — teacher can generate multiple snapshots over time for trend data.
+// triggeredById is nullable — future: system auto-triggers.
+//
+// avgMps         → class average MPS (line chart over time)
+// lowestMps      → weakest student's MPS (Detection Engine alert)
+// highestMps     → strongest student's MPS
+// atRiskCount    → students with isAtRisk = true at snapshot time (dashboard stat card)
+// completedCount → students who had finished the lesson when snapshot was taken
+//
+// Feeds:
+//   Focus Engine    → atRiskCount stat card
+//   Progress Engine → avgMps over time (line chart)
+//   Dashboard       → stat cards (avgMps, atRiskCount, completedCount)
+model ClassLessonSnapshot {
+  id             Int       @id @default(autoincrement())
+  classRoom      ClassRoom @relation(fields: [classRoomId], references: [id], onDelete: Cascade)
+  classRoomId    Int
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId       Int
+  triggeredBy    Teacher?  @relation(fields: [triggeredById], references: [id], onDelete: SetNull)
+  triggeredById  Int? // null = system triggered (future)
+  totalStudents  Int // total students in section at snapshot time
+  completedCount Int // students who had finished the lesson
+  avgMps         Float // class average MPS
+  lowestMps      Float // lowest individual MPS in the class
+  highestMps     Float // highest individual MPS in the class
+  atRiskCount    Int // students with mps < 75
+  snapshotAt     DateTime  @default(now())
+
+  // no unique constraint — multiple snapshots per classroom per lesson = trend data
+  @@index([classRoomId])
+  @@index([lessonId])
+  @@index([triggeredById])
+  @@index([snapshotAt])
+  @@index([classRoomId, lessonId, snapshotAt]) // Progress Engine: trend query
+}
+
+// ── Badge Tables ───────────────────────────────────────────────────────────
+
+// Badge milestones — system-seeded by dev.
+// xpRequired is the XP threshold a student must reach to earn this badge.
 model StudentBadge {
   id        Int      @id @default(autoincrement())
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -216,5 +597,7 @@ model StudentBadge {
   badgeId   Int
   earnedAt  DateTime @default(now())
 
-  @@unique([studentId, badgeId]) // a student can only earn each badge once
+  @@unique([studentId, badgeId])
+  @@index([studentId])
+  @@index([badgeId])
 }
