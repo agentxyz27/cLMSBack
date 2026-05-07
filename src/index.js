@@ -31,6 +31,8 @@ const templateRoutes = require('./core/routes/templates')
 const progressRoutes = require('./core/routes/progress')
 
 const questionRoutes = require('./assessment/routes/questions')
+const attemptRoutes = require('./assessment/routes/attempt')
+const snapshotRoutes = require('./assessment/routes/snapshots')
 
 const gamificationRoutes = require('./gamification/routes/gamification')
 
@@ -44,6 +46,8 @@ app.use('/api/templates', templateRoutes)
 app.use('/api/progress', progressRoutes)
 
 app.use('/api/questions', questionRoutes)
+app.use('/api/attempts', attemptRoutes)
+app.use('/api/snapshots', snapshotRoutes)
 
 app.use('/api/gamification', gamificationRoutes)
 

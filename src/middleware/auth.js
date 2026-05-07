@@ -29,7 +29,6 @@ const protect = (req, res, next) => {
     // for teachers: also contains { isAdmin }
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
-    console.log('req.user:', decoded)
     next() // pass control to the next middleware or controller
   } catch (err) {
     res.status(401).json({ message: 'Invalid token' })
