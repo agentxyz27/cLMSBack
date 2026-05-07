@@ -14,7 +14,7 @@
  * Badge Rules:
  * - Badges are awarded automatically when XP threshold is reached
  */
-const prisma = require('../prisma')
+const prisma = require('../../prisma')
 
 /**
  * Calculates XP earned based on score.

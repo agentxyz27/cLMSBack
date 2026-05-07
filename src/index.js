@@ -21,24 +21,32 @@ app.get('/api/health', (req, res) => {
 // ========================
 // Routes
 // ========================
-const authRoutes = require('./routes/auth')
-const sectionRoutes = require('./routes/section')
-const subjectRoutes = require('./routes/subject')
-const classroomRoutes = require('./routes/classroom')
-const lessonRoutes = require('./routes/lessons')
-const progressRoutes = require('./routes/progress')
-const gamificationRoutes = require('./routes/gamification')
-const templateRoutes = require('./routes/templates')
+const authRoutes = require('./auth/routes/auth')
 
-app.use('/api/auth', authRoutes)          // teacher/student auth
-app.use('/api/subjects', subjectRoutes)
-app.use('/api/sections', sectionRoutes)   //sections for registration form
+const classroomRoutes = require('./core/routes/classroom')
+const sectionRoutes = require('./core/routes/section')
+const subjectRoutes = require('./core/routes/subject')
+const lessonRoutes = require('./core/routes/lessons')
+const templateRoutes = require('./core/routes/templates')
+const progressRoutes = require('./core/routes/progress')
+
+const questionRoutes = require('./assessment/routes/questions')
+
+const gamificationRoutes = require('./gamification/routes/gamification')
+
+app.use('/api/auth', authRoutes)
+
 app.use('/api', classroomRoutes)
-app.use('/api/lessons', lessonRoutes)     //lessons
-app.use('/api/progress', progressRoutes)  //progress
-app.use('/api/gamification', gamificationRoutes)
-app.use('/api/upload', require('./routes/upload'))
+app.use('/api/sections', sectionRoutes)
+app.use('/api/subjects', subjectRoutes)
+app.use('/api/lessons', lessonRoutes)
 app.use('/api/templates', templateRoutes)
+app.use('/api/progress', progressRoutes)
+
+app.use('/api/questions', questionRoutes)
+
+app.use('/api/gamification', gamificationRoutes)
+
 
 // ========================
 // Start Server

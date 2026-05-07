@@ -7,7 +7,7 @@
  */
 const express = require('express')
 const router = express.Router()
-const protect = require('../middleware/auth')
+const protect = require('../../middleware/auth')
 const { completeLesson, getLeaderboard, getMyBadges } = require('../controllers/gamificationController')
 
 router.post('/complete', protect, completeLesson)

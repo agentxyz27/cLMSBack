@@ -3,7 +3,7 @@
  *
  * Handles section-related business logic.
  */
-const prisma = require('../prisma')
+const prisma = require('../../prisma')
 
 const getAllSections = async () => {
   return await prisma.grade.findMany({

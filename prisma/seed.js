@@ -9,6 +9,7 @@
  * - Grades (4, 5, 6)
  * - Sections per grade
  * - Subjects (Math unlocked, rest locked)
+ * - Topics (Mathematics topics for elementary)
  * - Default badges with XP thresholds
  *
  * Uses upsert to prevent duplicate entries —
@@ -49,7 +50,7 @@ async function main() {
     }
   }
 
-  console.log('Grades and sections seeded successfully')
+  console.log('✅ Grades and sections seeded')
 
   /**
    * SUBJECTS
@@ -57,13 +58,13 @@ async function main() {
    * Only Mathematics is unlocked for the prototype.
    */
   const subjects = [
-    { name: 'Mathematics',              description: 'Fundamentals of numeracy and calculation.',      isLocked: false },
-    { name: 'Science',                  description: 'Introduced formally from Grade 3 onwards.',      isLocked: true  },
-    { name: 'English',                  description: 'Language arts and communication.',               isLocked: true  },
-    { name: 'Filipino',                 description: 'Language arts and communication.',               isLocked: true  },
-    { name: 'Araling Panlipunan',       description: 'History, geography, and culture.',              isLocked: true  },
-    { name: 'GMRC / Values Education',  description: 'Good Manners and Right Conduct.',               isLocked: true  },
-    { name: 'MAPEH',                    description: 'Music, Arts, Physical Education, and Health.',  isLocked: true  }
+    { name: 'Mathematics',             description: 'Fundamentals of numeracy and calculation.',     isLocked: false },
+    { name: 'Science',                 description: 'Introduced formally from Grade 3 onwards.',     isLocked: true  },
+    { name: 'English',                 description: 'Language arts and communication.',              isLocked: true  },
+    { name: 'Filipino',                description: 'Language arts and communication.',              isLocked: true  },
+    { name: 'Araling Panlipunan',      description: 'History, geography, and culture.',             isLocked: true  },
+    { name: 'GMRC / Values Education', description: 'Good Manners and Right Conduct.',              isLocked: true  },
+    { name: 'MAPEH',                   description: 'Music, Arts, Physical Education, and Health.', isLocked: true  }
   ]
 
   for (const subject of subjects) {
@@ -74,7 +75,48 @@ async function main() {
     })
   }
 
-  console.log('Subjects seeded successfully')
+  console.log('✅ Subjects seeded')
+
+  /**
+   * TOPICS — Mathematics (Elementary)
+   * These are the measurable skills the 4 engines track.
+   * Seeded by dev only — never created by teachers.
+   * Each topic is tagged to Mathematics and has no prerequisite by default.
+   * Prerequisite chains can be added later as the curriculum matures.
+   */
+  const mathematics = await prisma.subject.findUnique({
+    where: { name: 'Mathematics' }
+  })
+
+  const mathTopics = [
+    { name: 'Addition' },
+    { name: 'Subtraction' },
+    { name: 'Multiplication' },
+    { name: 'Division' },
+    { name: 'Fractions' },
+    { name: 'Decimals' },
+    { name: 'Geometry' },
+    { name: 'Measurement' },
+    { name: 'Word Problems' },
+    { name: 'Patterns' },
+    { name: 'Place Value' },
+    { name: 'Time' },
+    { name: 'Money' },
+    { name: 'Data and Graphs' }
+  ]
+
+  for (const topic of mathTopics) {
+    await prisma.topic.upsert({
+      where: { subjectId_name: { subjectId: mathematics.id, name: topic.name } },
+      update: {},
+      create: {
+        name:      topic.name,
+        subjectId: mathematics.id
+      }
+    })
+  }
+
+  console.log('✅ Mathematics topics seeded')
 
   /**
    * BADGES
@@ -98,7 +140,8 @@ async function main() {
     })
   }
 
-  console.log('Badges seeded successfully')
+  console.log('✅ Badges seeded')
+  console.log('🌱 Seed complete')
 }
 
 main()

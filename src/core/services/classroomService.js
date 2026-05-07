@@ -5,7 +5,7 @@
  * A classroom links a teacher, a subject, and a section.
  * Teachers self-assign by creating a classroom.
  */
-const prisma = require('../prisma')
+const prisma = require('../../prisma')
 
 /**
  * Teacher creates a classroom by picking a subject and section.

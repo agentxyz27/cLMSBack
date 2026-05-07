@@ -7,7 +7,7 @@
  * completeLesson → marks a lesson as completed and records score
  * getProgress    → returns all progress records for the logged-in student
  */
-const prisma = require('../prisma')
+const prisma = require('../../prisma')
 
 /**
  * POST /api/progress

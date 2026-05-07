@@ -3,7 +3,7 @@
  */
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-const roleConfig = require('../config/roleConfig')
+const roleConfig = require('../../config/roleConfig')
 
 /**
  * JWT GENERATOR

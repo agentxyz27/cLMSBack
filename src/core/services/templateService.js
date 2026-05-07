@@ -13,7 +13,7 @@
  * Templates are directly reusable lessons.
  */
 
-const prisma = require('../prisma')
+const prisma = require('../../prisma')
 
 /**
  * Create template (must already be a valid lesson graph)
