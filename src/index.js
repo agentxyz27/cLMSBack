@@ -23,6 +23,7 @@ app.get('/api/health', (req, res) => {
 // ========================
 const authRoutes = require('./auth/routes/auth')
 
+//Core
 const classroomRoutes = require('./core/routes/classroom')
 const sectionRoutes = require('./core/routes/section')
 const subjectRoutes = require('./core/routes/subject')
@@ -30,10 +31,18 @@ const lessonRoutes = require('./core/routes/lessons')
 const templateRoutes = require('./core/routes/templates')
 const progressRoutes = require('./core/routes/progress')
 
+//Assessment
 const questionRoutes = require('./assessment/routes/questions')
 const attemptRoutes = require('./assessment/routes/attempt')
 const snapshotRoutes = require('./assessment/routes/snapshots')
 
+//Intelligence
+const detectionRoutes = require('./intelligence/routes/detection')
+const focusRoutes = require('./intelligence/routes/focus')
+const templateEngineRoutes = require('./intelligence/routes/templateEngine')
+const progressEngineRoutes = require('./intelligence/routes/progressEngine')
+
+//Gamified
 const gamificationRoutes = require('./gamification/routes/gamification')
 
 app.use('/api/auth', authRoutes)
@@ -48,6 +57,11 @@ app.use('/api/progress', progressRoutes)
 app.use('/api/questions', questionRoutes)
 app.use('/api/attempts', attemptRoutes)
 app.use('/api/snapshots', snapshotRoutes)
+
+app.use('/api/detection', detectionRoutes)
+app.use('/api/focus', focusRoutes)
+app.use('/api/template-engine', templateEngineRoutes)
+app.use('/api/progress-engine', progressEngineRoutes)
 
 app.use('/api/gamification', gamificationRoutes)
 
