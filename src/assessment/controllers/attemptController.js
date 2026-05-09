@@ -6,11 +6,11 @@ const attemptService = require('../services/attemptService')
 // Returns the session token so the frontend can resume if interrupted.
 const startQuestion = async (req, res) => {
   try {
-    const session = await attemptService.startQuestion(
+    const { resumed, session } = await attemptService.startQuestion(
       req.user.id,
       req.params.questionId
     )
-    res.status(201).json({ message: 'Session started', session })
+    res.status(201).json({ message: 'Session started', resumed, session })
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message })
   }
