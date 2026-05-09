@@ -1,5 +1,5 @@
 /**
- * requireAdmin.js
+ * requireAdmin.ts
  *
  * Restricts routes to teachers with admin privileges.
  * Must be used after protect middleware.
@@ -10,11 +10,16 @@
  * Usage:
  *   router.delete('/:id', protect, requireAdmin, deleteUser)
  */
-const requireAdmin = (req, res, next) => {
+import { Request, Response, NextFunction } from 'express'
+
+const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user || req.user.role !== 'teacher' || !req.user.isAdmin) {
-    return res.status(403).json({ message: 'Access denied — admin privilege required' })
+    res.status(403).json({ message: 'Access denied — admin privilege required' })
+    return
   }
   next()
 }
+
+export default requireAdmin
 
 module.exports = requireAdmin

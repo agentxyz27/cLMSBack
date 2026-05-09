@@ -1,26 +1,28 @@
 /**
- * authService.js
+ * authService.ts
  */
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
-const roleConfig = require('../../config/roleConfig')
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import roleConfig from '../../config/roleConfig'
+
+type Role = 'teacher' | 'student'
 
 /**
  * JWT GENERATOR
  * teacher → includes isAdmin
  * student → includes sectionId
  */
-const generateToken = (user, role) => {
-  const payload = { id: user.id, role }
+const generateToken = (user: any, role: Role): string => {
+  const payload: Record<string, unknown> = { id: user.id, role }
   if (role === 'teacher') payload.isAdmin = user.isAdmin ?? false
   if (role === 'student') payload.sectionId = user.sectionId
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: '7d' })
 }
 
 /**
  * REGISTER
  */
-const register = async (role, data) => {
+const register = async (role: Role, data: Record<string, any>) => {
   const config = roleConfig[role]
   if (!config) throw { status: 400, message: 'Invalid role' }
 
@@ -30,8 +32,8 @@ const register = async (role, data) => {
   }
 
   const hashed = await bcrypt.hash(data.password, 10)
+  const payload: Record<string, any> = {}
 
-  const payload = {}
   for (const field of config.createFields) {
     payload[field] = data[field]
   }
@@ -41,14 +43,13 @@ const register = async (role, data) => {
   if (payload.sectionId) payload.sectionId = parseInt(payload.sectionId)
 
   const user = await config.model.create({ data: payload })
-
   return Object.fromEntries(Object.keys(config.select).map(k => [k, user[k]]))
 }
 
 /**
  * LOGIN
  */
-const login = async (role, { email, password }) => {
+const login = async (role: Role, { email, password }: { email: string; password: string }) => {
   const config = roleConfig[role]
   if (!config) throw { status: 400, message: 'Invalid role' }
 
@@ -60,14 +61,14 @@ const login = async (role, { email, password }) => {
 
   return {
     message: 'Login successful',
-    token: generateToken(user, config.tokenRole)
+    token: generateToken(user, config.tokenRole as Role)
   }
 }
 
 /**
  * PROFILE
  */
-const getMe = async ({ id, role }) => {
+const getMe = async ({ id, role }: { id: number; role: Role }) => {
   const config = roleConfig[role]
   if (!config) throw { status: 400, message: 'Invalid role' }
 
@@ -77,4 +78,4 @@ const getMe = async ({ id, role }) => {
   return { ...user, role }
 }
 
-module.exports = { register, login, getMe }
+export default { register, login, getMe }
