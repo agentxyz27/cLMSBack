@@ -41,6 +41,8 @@ const detectionRoutes = require('./intelligence/routes/detection')
 const focusRoutes = require('./intelligence/routes/focus')
 const templateEngineRoutes = require('./intelligence/routes/templateEngine')
 const progressEngineRoutes = require('./intelligence/routes/progressEngine')
+const classHealthRoutes = require('./intelligence/routes/classHealth')
+const classTrendRoutes = require('./intelligence/routes/classHealth')
 
 //Gamified
 const gamificationRoutes = require('./gamification/routes/gamification')
@@ -62,6 +64,8 @@ app.use('/api/detection', detectionRoutes)
 app.use('/api/focus', focusRoutes)
 app.use('/api/template-engine', templateEngineRoutes)
 app.use('/api/progress-engine', progressEngineRoutes)
+app.use('/api/classroom-health', classHealthRoutes)
+app.use('/api/classroom-health/trend', classTrendRoutes)
 
 app.use('/api/gamification', gamificationRoutes)
 
