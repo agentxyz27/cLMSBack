@@ -13,7 +13,7 @@ const router = express.Router()
 const multer = require('multer')
 const protect = require('../middleware/auth')
 const requireRole = require('../middleware/requireRole')
-const { uploadFile } = require('../controllers/uploadController')
+const { uploadFile } = require('./uploadController')
 
 // Store file in memory — we pass the buffer directly to Supabase
 const upload = multer({

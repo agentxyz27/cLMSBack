@@ -47,6 +47,8 @@ const classTrendRoutes = require('./intelligence/routes/classHealth')
 //Gamified
 const gamificationRoutes = require('./gamification/routes/gamification')
 
+const uploadRoutes = require('./standby/upload')
+
 app.use('/api/auth', authRoutes)
 
 app.use('/api', classroomRoutes)
@@ -68,6 +70,8 @@ app.use('/api/classroom-health', classHealthRoutes)
 app.use('/api/classroom-health/trend', classTrendRoutes)
 
 app.use('/api/gamification', gamificationRoutes)
+
+app.use('/api/upload', uploadRoutes)
 
 
 // ========================

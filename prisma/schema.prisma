@@ -125,6 +125,7 @@ datasource db {
 // Determines which frontend component renders the question.
 enum TemplateType {
   DRAG_MATCH // drag items to correct targets
+  MULTIPLE_CHOICE 
   FILL_STEP // fill in a missing step in a sequence
   VISUAL_GROUPING // sort items into correct groups
   NUMBER_LINE // place a value on a number line

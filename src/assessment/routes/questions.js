@@ -12,15 +12,16 @@ const {
   reorderQuestions
 } = require('../controllers/questionController')
 
-// All question routes require an authenticated teacher
+// ── Student-accessible routes (any authenticated user) ─────────────────────
+router.get('/:id', protect, getQuestion)  // students need this to render questions
+
+// ── Teacher-only routes ────────────────────────────────────────────────────
 router.use(protect, requireRole('teacher'))
 
-// ── Question CRUD ──────────────────────────────────────────────────────────
-router.post('/',                              createQuestion)   // POST   /api/questions
-router.get('/lesson/:lessonId',               getQuestions)     // GET    /api/questions/lesson/:lessonId
-router.get('/:id',                            getQuestion)      // GET    /api/questions/:id
-router.patch('/:id',                          updateQuestion)   // PATCH  /api/questions/:id
-router.delete('/:id',                         deleteQuestion)   // DELETE /api/questions/:id
-router.patch('/lesson/:lessonId/reorder',     reorderQuestions) // PATCH  /api/questions/lesson/:lessonId/reorder
+router.post('/',                              createQuestion)
+router.get('/lesson/:lessonId',               getQuestions)
+router.patch('/:id',                          updateQuestion)
+router.delete('/:id',                         deleteQuestion)
+router.patch('/lesson/:lessonId/reorder',     reorderQuestions)
 
 module.exports = router
