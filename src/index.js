@@ -8,7 +8,13 @@ const app = express()
 // Middleware
 // ========================
 
-app.use(cors({ origin: 'http://localhost:5173' })) // allows Vite frontend to talk to this API
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://eduforgeclms.vercel.app'
+  ],
+  credentials: true
+}))
 app.use(express.json())  // parses incoming JSON request bodies
 
 // ========================
