@@ -55,6 +55,9 @@ const gamificationRoutes = require('./gamification/routes/gamification')
 
 const uploadRoutes = require('./standby/upload')
 
+const simulateRouter = require('./simulation/routes/simulate')
+
+
 app.use('/api/auth', authRoutes)
 
 app.use('/api', classroomRoutes)
@@ -78,6 +81,9 @@ app.use('/api/classroom-health/trend', classTrendRoutes)
 app.use('/api/gamification', gamificationRoutes)
 
 app.use('/api/upload', uploadRoutes)
+
+app.use('/simulate', simulateRouter)
+
 
 
 // ========================
